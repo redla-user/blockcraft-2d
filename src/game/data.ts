@@ -19,10 +19,10 @@ export type ObjKind =
 
 export interface Tile {
   t: TileType;
-  ore?: Ore;
-  obj?: ObjKind;
+  ore?: Ore | undefined;
+  obj?: ObjKind | undefined;
   /** world-time seconds when a crop was planted */
-  pt?: number;
+  pt?: number | undefined;
 }
 
 export const TILE_COLORS: Record<TileType, [string, string]> = {

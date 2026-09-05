@@ -113,7 +113,7 @@ export class World {
     const cx = Math.floor(x / CHUNK);
     const cy = Math.floor(y / CHUNK);
     const c = this.chunk(cx, cy);
-    return c[(y - cy * CHUNK) * CHUNK + (x - cx * CHUNK)];
+    return c[(y - cy * CHUNK) * CHUNK + (x - cx * CHUNK)] as Tile;
   }
 
   set(x: number, y: number, tile: Tile) {
