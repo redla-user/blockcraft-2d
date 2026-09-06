@@ -247,7 +247,7 @@ export class Game {
       toast: this.toast,
       held: this.held ? { ...this.held } : null,
       mining: this.mining,
-      sleeping: this.sleeping > 0 ? 1 : 0,
+      sleeping: this.sleeping > 0,
     });
   }
 
