@@ -7,11 +7,16 @@ export type ObjKind =
   | "tree"
   | "mountain"
   | "bed"
+  | "bed2"
+  | "door_closed"
+  | "door_open"
   | "block_dirt"
   | "block_stone"
   | "block_sand"
   | "block_wood"
-  | "block_wool"
+  | "block_settings"
+  | "block_iron"
+  | "block_diamond"
   | "crop0"
   | "crop1"
   | "crop2"
@@ -48,11 +53,16 @@ export const OBJ_SOLID: Record<ObjKind, boolean> = {
   tree: true,
   mountain: true,
   bed: false,
+  bed2: false,
+  door_closed: true,
+  door_open: false,
   block_dirt: true,
   block_stone: true,
   block_sand: true,
   block_wood: true,
-  block_wool: true,
+  block_settings: true,
+  block_iron: true,
+  block_diamond: true,
   crop0: false,
   crop1: false,
   crop2: false,
@@ -64,15 +74,44 @@ export const OBJ_TALL: Record<ObjKind, boolean> = {
   tree: true,
   mountain: true,
   bed: false,
+  bed2: false,
+  door_closed: true,
+  door_open: true,
   block_dirt: true,
   block_stone: true,
   block_sand: true,
   block_wood: true,
-  block_wool: true,
+  block_settings: true,
+  block_iron: true,
+  block_diamond: true,
   crop0: false,
   crop1: false,
   crop2: false,
   crop3: false,
+};
+
+/** sprite key used for an object (undefined = procedural drawing) */
+export const OBJ_SPRITE: Partial<Record<ObjKind, string>> = {
+  bed: "bed",
+  door_closed: "door",
+  door_open: "door",
+  block_dirt: "dirt",
+  block_stone: "stone",
+  block_wood: "planks",
+  block_settings: "settings",
+  block_iron: "iron_block",
+  block_diamond: "diamond_block",
+};
+
+/** item dropped when a placed block is broken */
+export const BLOCK_DROP: Partial<Record<ObjKind, string>> = {
+  block_dirt: "dirt",
+  block_stone: "stone",
+  block_sand: "sand",
+  block_wood: "wood",
+  block_settings: "settings",
+  block_iron: "iron_block",
+  block_diamond: "diamond_block",
 };
 
 export type ToolType = "sword" | "pickaxe" | "axe" | "hoe";
@@ -90,6 +129,8 @@ export interface ItemDef {
   name: string;
   color: string;
   stack: number;
+  /** sprite key for the item icon */
+  icon?: string;
   place?: ObjKind;
   food?: number;
   tool?: { type: ToolType; tier: Tier };
@@ -104,28 +145,35 @@ function tool(type: ToolType, tier: Tier): ItemDef {
     hoe: "Hoe",
   };
   const tn = tier.charAt(0).toUpperCase() + tier.slice(1);
-  return {
+  const iconKey = `${tier}_${type}`;
+  const def: ItemDef = {
     id: `${tier}_${type}`,
     name: `${tn} ${names[type]}`,
     color: TIER_COLOR[tier],
     stack: 1,
     tool: { type, tier },
   };
+  if (type !== "hoe") def.icon = iconKey;
+  else def.icon = `${tier}_axe`;
+  return def;
 }
 
 const list: ItemDef[] = [
-  { id: "dirt", name: "Dirt", color: "#8b6039", stack: 64, place: "block_dirt" },
-  { id: "stone", name: "Stone", color: "#8a8a8a", stack: 64, place: "block_stone" },
+  { id: "dirt", name: "Dirt", color: "#8b6039", stack: 64, place: "block_dirt", icon: "dirt" },
+  { id: "stone", name: "Stone", color: "#8a8a8a", stack: 64, place: "block_stone", icon: "stone" },
   { id: "sand", name: "Sand", color: "#e6d9a2", stack: 64, place: "block_sand" },
-  { id: "wood", name: "Wood", color: "#7b5220", stack: 64, place: "block_wood" },
-  { id: "wool", name: "Wool", color: "#f2f2f2", stack: 64, place: "block_wool" },
-  { id: "iron", name: "Iron Ore", color: "#d9b48a", stack: 64 },
-  { id: "diamond", name: "Diamond", color: "#4fe0d6", stack: 64 },
+  { id: "wood", name: "Wood", color: "#7b5220", stack: 64, place: "block_wood", icon: "log" },
+  { id: "settings", name: "Settings Block", color: "#5a5f66", stack: 64, place: "block_settings", icon: "settings" },
+  { id: "iron", name: "Iron", color: "#d9d9d9", stack: 64, icon: "iron_ingot" },
+  { id: "diamond", name: "Diamond", color: "#4fe0d6", stack: 64, icon: "diamond_gem" },
+  { id: "iron_block", name: "Iron Block", color: "#e6e6e6", stack: 64, place: "block_iron", icon: "iron_block" },
+  { id: "diamond_block", name: "Diamond Block", color: "#4fe0d6", stack: 64, place: "block_diamond", icon: "diamond_block" },
   { id: "seeds", name: "Seeds", color: "#b9c94a", stack: 64, seed: true },
   { id: "wheat", name: "Wheat", color: "#e0c04a", stack: 64, food: 20 },
-  { id: "meat", name: "Meat", color: "#c4552f", stack: 64, food: 35 },
-  { id: "bed", name: "Bed", color: "#c33b3b", stack: 1, place: "bed" },
-  { id: "stick", name: "Stick", color: "#a3762f", stack: 64 },
+  { id: "meat", name: "Meat", color: "#c4552f", stack: 64, food: 35, icon: "meat" },
+  { id: "bed", name: "Sleeping Tube", color: "#7fd7f0", stack: 1, place: "bed", icon: "bed" },
+  { id: "door", name: "Wooden Door", color: "#a3762f", stack: 4, place: "door_closed", icon: "door" },
+  { id: "stick", name: "Stick", color: "#a3762f", stack: 64, icon: "stick" },
 ];
 
 (["wood", "stone", "iron", "diamond"] as Tier[]).forEach((t) => {
@@ -153,7 +201,10 @@ const matFor: Record<Tier, string> = {
 
 export const RECIPES: Recipe[] = [
   { id: "sticks", result: "stick", count: 4, cat: "Materials", need: [{ id: "wood", n: 1 }] },
-  { id: "bed", result: "bed", count: 1, cat: "Comfort", need: [{ id: "wool", n: 3 }, { id: "wood", n: 2 }] },
+  { id: "iron_block", result: "iron_block", count: 1, cat: "Materials", need: [{ id: "iron", n: 9 }] },
+  { id: "diamond_block", result: "diamond_block", count: 1, cat: "Materials", need: [{ id: "diamond", n: 9 }] },
+  { id: "bed", result: "bed", count: 1, cat: "Comfort", need: [{ id: "settings", n: 2 }, { id: "iron", n: 2 }] },
+  { id: "door", result: "door", count: 1, cat: "Comfort", need: [{ id: "wood", n: 4 }] },
   { id: "seeds", result: "seeds", count: 2, cat: "Food", need: [{ id: "wheat", n: 1 }] },
 ];
 
