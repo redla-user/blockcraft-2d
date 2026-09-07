@@ -1,6 +1,7 @@
 // Game engine: state, simulation, rendering. Framework-agnostic.
 import {
   ITEMS,
+  BLOCK_DROP,
   MINE_REQ,
   OBJ_TALL,
   RECIPES,
@@ -12,7 +13,7 @@ import {
 } from "./data";
 import { InputMap } from "./input";
 import { World, writeSave, type WorldSave } from "./world";
-import { drawGround, drawMob, drawObject, drawPlayer } from "./sprites";
+import { drawGround, drawMob, drawObject, drawPlayer, preloadSprites } from "./sprites";
 
 export interface Slot {
   id: string;
@@ -37,7 +38,7 @@ export interface Hud {
   sleeping: boolean;
 }
 
-type MobKind = "pig" | "cow" | "sheep" | "zombie" | "skeleton" | "spider" | "creeper";
+type MobKind = "insect" | "hover" | "builder" | "corrupted" | "phantom" | "electric" | "creeper";
 
 interface MobDef {
   hp: number;
@@ -52,12 +53,12 @@ interface MobDef {
 }
 
 const MOBS: Record<MobKind, MobDef> = {
-  pig: { hp: 10, speed: 1.1, range: 0, dmg: 0, hostile: false, drop: { id: "meat", n: 2 } },
-  cow: { hp: 12, speed: 1.0, range: 0, dmg: 0, hostile: false, drop: { id: "meat", n: 2 } },
-  sheep: { hp: 10, speed: 1.1, range: 0, dmg: 0, hostile: false, drop: { id: "wool", n: 2 } },
-  zombie: { hp: 20, speed: 1.7, range: 11, dmg: 6, hostile: true },
-  skeleton: { hp: 16, speed: 1.5, range: 12, dmg: 5, hostile: true, shoots: true, drop: { id: "stick", n: 1 } },
-  spider: { hp: 14, speed: 2.6, range: 12, dmg: 4, hostile: true, erratic: true },
+  insect: { hp: 10, speed: 1.1, range: 0, dmg: 0, hostile: false, drop: { id: "meat", n: 2 } },
+  hover: { hp: 12, speed: 1.0, range: 0, dmg: 0, hostile: false, drop: { id: "meat", n: 2 } },
+  builder: { hp: 10, speed: 1.1, range: 0, dmg: 0, hostile: false, drop: { id: "settings", n: 2 } },
+  corrupted: { hp: 20, speed: 1.7, range: 11, dmg: 6, hostile: true },
+  phantom: { hp: 24, speed: 1.5, range: 12, dmg: 5, hostile: true, shoots: true, drop: { id: "stick", n: 1 } },
+  electric: { hp: 14, speed: 2.6, range: 12, dmg: 4, hostile: true, erratic: true },
   creeper: { hp: 18, speed: 1.5, range: 12, dmg: 22, hostile: true, explodes: true },
 };
 
@@ -73,6 +74,8 @@ interface Mob {
   cool: number;
   fuse: number;
   flash: boolean;
+  hurt: number;
+  bob: number;
 }
 
 interface Arrow {
@@ -135,7 +138,8 @@ export class Game {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas 2D not available");
     this.ctx = ctx;
-    this.ctx.imageSmoothingEnabled = false;
+    this.ctx.imageSmoothingEnabled = true;
+    preloadSprites();
     this.saveId = opts.saveId;
     this.difficulty = opts.difficulty;
     this.world = new World(opts.seed, opts.save?.changes ?? {});
@@ -492,6 +496,7 @@ export class Game {
         const tier = this.toolOf("sword");
         const dmg = tier ? 4 + TIER_LEVEL[tier] * 3 : 3;
         target.hp -= dmg;
+        target.hurt = 0.35;
         target.flee = 1.4;
         const away = Math.atan2(target.y - this.y, target.x - this.x);
         target.vx = Math.cos(away) * 3;
@@ -506,8 +511,16 @@ export class Game {
       return;
     }
 
-    // sleep in a bed
-    if (pressed && tile.obj === "bed") {
+    // open / close a door
+    if (pressed && (tile.obj === "door_closed" || tile.obj === "door_open")) {
+      const open = tile.obj === "door_closed";
+      this.world.set(tx, ty, { ...tile, obj: open ? "door_open" : "door_closed" });
+      this.say(open ? "Door opened" : "Door closed");
+      return;
+    }
+
+    // sleep in a sleeping tube
+    if (pressed && (tile.obj === "bed" || tile.obj === "bed2")) {
       if (this.isNight()) {
         this.sleeping = 1.6;
         this.say("Sleeping...");
@@ -559,6 +572,18 @@ export class Game {
       } else this.say("Not ripe yet");
       return;
     }
+    // place the 2-tile sleeping tube
+    if (pressed && selDef?.place === "bed" && !tile.obj && tile.t !== "water") {
+      const nxt = this.world.get(tx + 1, ty);
+      if (nxt.obj || nxt.t === "water") {
+        this.say("Needs 2 free tiles");
+        return;
+      }
+      this.world.set(tx, ty, { ...tile, obj: "bed" });
+      this.world.set(tx + 1, ty, { ...nxt, obj: "bed2" });
+      this.take(sel!.id, 1);
+      return;
+    }
     // place block
     if (selDef?.place && !tile.obj && tile.t !== "water") {
       this.world.set(tx, ty, { ...tile, obj: selDef.place });
@@ -587,10 +612,11 @@ export class Game {
         return { kind: "obj", rate: 0.4 + TIER_LEVEL[tier] * 0.35, drop: { id: "stone", n: 3 } };
       }
       if (tile.obj.startsWith("block_")) {
-        const id = tile.obj.slice(6);
-        return { kind: "obj", rate: 1.6, drop: { id: id === "wool" ? "wool" : id, n: 1 } };
+        const id = BLOCK_DROP[tile.obj] ?? "dirt";
+        return { kind: "obj", rate: 1.6, drop: { id, n: 1 } };
       }
-      if (tile.obj === "bed") return { kind: "obj", rate: 1.6, drop: { id: "bed", n: 1 } };
+      if (tile.obj === "bed" || tile.obj === "bed2") return { kind: "obj", rate: 1.6, drop: { id: "bed", n: 1 } };
+      if (tile.obj === "door_closed" || tile.obj === "door_open") return { kind: "obj", rate: 1.6, drop: { id: "door", n: 1 } };
       return null;
     }
     if (tile.t === "stone") {
@@ -607,6 +633,12 @@ export class Game {
 
   private breakTile(tx: number, ty: number, tile: Tile, mine: { kind: string; drop: { id: string; n: number } }) {
     if (mine.kind === "obj") {
+      if (tile.obj === "bed" || tile.obj === "bed2") {
+        for (const dx of [-1, 0, 1]) {
+          const t2 = this.world.get(tx + dx, ty);
+          if (t2.obj === "bed" || t2.obj === "bed2") this.world.set(tx + dx, ty, { ...t2, obj: undefined, pt: undefined });
+        }
+      }
       this.world.set(tx, ty, { ...tile, obj: undefined, pt: undefined });
     } else if (mine.kind === "ore") {
       this.world.set(tx, ty, { ...tile, ore: undefined });
@@ -635,10 +667,10 @@ export class Game {
     const maxPassive = 8;
     const kinds: MobKind[] = night
       ? hostile < maxHostile
-        ? ["zombie", "skeleton", "spider", "creeper"]
+        ? ["corrupted", "phantom", "electric", "creeper"]
         : []
       : passive < maxPassive
-        ? ["pig", "cow", "sheep"]
+        ? ["insect", "hover", "builder"]
         : [];
     if (!kinds.length) return;
     const kind = kinds[Math.floor(Math.random() * kinds.length)]!;
@@ -660,6 +692,8 @@ export class Game {
           cool: 0,
           fuse: 0,
           flash: false,
+          hurt: 0,
+          bob: Math.random() * 6.28,
         });
         return;
       }
@@ -674,14 +708,16 @@ export class Game {
       const dy = this.y - m.y;
       const dist = Math.hypot(dx, dy);
       m.cool -= dt;
-      m.flash = false;
+      m.bob += dt * 3.4;
+      if (m.hurt > 0) m.hurt -= dt;
+      m.flash = m.hurt > 0;
 
       if (m.flee > 0) {
         m.flee -= dt;
       } else if (d.hostile && dist < d.range) {
         if (d.explodes && dist < 1.8) {
           m.fuse += dt;
-          m.flash = Math.floor(m.fuse * 8) % 2 === 0;
+          m.flash = m.flash || Math.floor(m.fuse * 8) % 2 === 0;
           m.vx = 0;
           m.vy = 0;
           if (m.fuse > 1.5) {
@@ -849,11 +885,13 @@ export class Game {
       const by = m.y * S - camY + S * 0.35;
       const kind = m.kind;
       const flash = m.flash;
-      draws.push({ baseY: by, fn: () => drawMob(c, kind, sx, by, S, flash) });
+      const bob = m.bob;
+      draws.push({ baseY: by, fn: () => drawMob(c, kind, sx, by, S, flash, bob) });
     }
     const psx = this.x * S - camX - S / 2;
     const pby = this.y * S - camY + S * 0.35;
-    draws.push({ baseY: pby, fn: () => drawPlayer(c, psx, pby, S, this.dir, this.hurtFlash > 0) });
+    const pbob = this.time * 3.2;
+    draws.push({ baseY: pby, fn: () => drawPlayer(c, psx, pby, S, this.dir, this.hurtFlash > 0, pbob) });
     draws.sort((a, b) => a.baseY - b.baseY);
     draws.forEach((d) => d.fn());
 
