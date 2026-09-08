@@ -76,6 +76,7 @@ interface Mob {
   flash: boolean;
   hurt: number;
   bob: number;
+  cave: boolean;
 }
 
 interface Arrow {
@@ -659,8 +660,12 @@ export class Game {
   }
 
   // ---------- mobs ----------
+  inCave(x = this.x, y = this.y) {
+    return this.world.get(Math.floor(x), Math.floor(y)).t === "cave";
+  }
+
   private trySpawn() {
-    const night = this.isNight();
+    const night = this.isNight() || this.inCave();
     const hostile = this.mobs.filter((m) => MOBS[m.kind].hostile).length;
     const passive = this.mobs.length - hostile;
     const maxHostile = night ? (this.difficulty === "hard" ? 12 : 6) : 0;
@@ -682,6 +687,7 @@ export class Game {
       if (this.world.walkable(Math.floor(x), Math.floor(y))) {
         this.mobs.push({
           kind,
+          cave: this.inCave(x, y),
           x,
           y,
           hp: MOBS[kind].hp,
@@ -777,7 +783,10 @@ export class Game {
       }
     }
     if (!this.isNight()) {
-      this.mobs = this.mobs.filter((m) => !MOBS[m.kind].hostile || Math.hypot(m.x - this.x, m.y - this.y) < 6);
+      // cave dwellers survive daylight — their cave stays dark all day
+      this.mobs = this.mobs.filter(
+        (m) => !MOBS[m.kind].hostile || m.cave || this.inCave(m.x, m.y) || Math.hypot(m.x - this.x, m.y - this.y) < 6,
+      );
     }
     this.mobs = this.mobs.filter((m) => Math.hypot(m.x - this.x, m.y - this.y) < 40);
   }
@@ -814,7 +823,7 @@ export class Game {
 
   private damage(n: number) {
     this.hp -= n;
-    this.hurtFlash = 0.25;
+    this.hurtFlash = 0.5;
   }
 
   respawn() {
@@ -920,8 +929,28 @@ export class Game {
       c.fillStyle = `rgba(6,10,40,${dark})`;
       c.fillRect(0, 0, W, H);
     }
+    // cave darkness: only a small circle around the player is lit
+    if (this.inCave()) {
+      const cx = W / 2;
+      const cy = H / 2;
+      const lit = S * 3.4;
+      const g = c.createRadialGradient(cx, cy, lit * 0.35, cx, cy, lit);
+      g.addColorStop(0, "rgba(4,4,8,0)");
+      g.addColorStop(0.65, "rgba(4,4,8,0.72)");
+      g.addColorStop(1, "rgba(2,2,5,0.985)");
+      c.fillStyle = g;
+      c.fillRect(0, 0, W, H);
+    }
+
     if (this.hurtFlash > 0) {
-      c.fillStyle = `rgba(180,20,20,${this.hurtFlash})`;
+      const a = Math.min(0.55, this.hurtFlash);
+      const cx = W / 2;
+      const cy = H / 2;
+      const r = Math.max(W, H) * 0.75;
+      const vg = c.createRadialGradient(cx, cy, r * 0.25, cx, cy, r);
+      vg.addColorStop(0, `rgba(190,20,20,${a * 0.25})`);
+      vg.addColorStop(1, `rgba(190,15,15,${a})`);
+      c.fillStyle = vg;
       c.fillRect(0, 0, W, H);
     }
   }
