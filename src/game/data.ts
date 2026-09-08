@@ -1,7 +1,7 @@
 // Static game data: tiles, items, tools, recipes.
 // Pure data — no rendering, no DOM.
 
-export type TileType = "grass" | "dirt" | "sand" | "water" | "stone" | "farmland";
+export type TileType = "grass" | "dirt" | "sand" | "water" | "stone" | "farmland" | "cave";
 export type Ore = "iron" | "diamond";
 export type ObjKind =
   | "tree"
