@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Game, type Hud } from "@/game/engine";
 import { ITEMS, RECIPES, type RecipeCategory } from "@/game/data";
 import { listWorlds, loadSave } from "@/game/world";
+import { SPRITE_URLS } from "@/game/sprite-assets";
 
 export const Route = createFileRoute("/play")({
   validateSearch: (s: Record<string, unknown>) => ({ id: String(s["id"] ?? "") }),
@@ -122,7 +123,7 @@ function Play() {
                 >
                   {s && (
                     <>
-                      <span className="chip" style={{ background: ITEMS[s.id]?.color ?? "#888" }} />
+                      <ItemIcon id={s.id} />
                       <span className="cnt">{s.n > 1 ? s.n : ""}</span>
                     </>
                   )}
@@ -153,10 +154,7 @@ function Play() {
                       <button key={i} className="cell" onClick={() => g?.clickSlot(i)}>
                         {s && (
                           <>
-                            <span
-                              className="chip"
-                              style={{ background: ITEMS[s.id]?.color ?? "#888" }}
-                            />
+                            <ItemIcon id={s.id} />
                             <span className="cnt">{s.n > 1 ? s.n : ""}</span>
                           </>
                         )}
@@ -198,10 +196,7 @@ function Play() {
                           className={"recipe" + (ok ? "" : " off")}
                           onClick={() => g?.craft(r.id)}
                         >
-                          <span
-                            className="chip"
-                            style={{ background: ITEMS[r.result]?.color ?? "#888" }}
-                          />
+                          <ItemIcon id={r.result} />
                           <span className="rname">
                             {ITEMS[r.result]?.name ?? r.result}
                             {r.count > 1 ? ` x${r.count}` : ""}
@@ -258,6 +253,14 @@ function Play() {
       </div>
     </main>
   );
+}
+
+
+function ItemIcon({ id }: { id: string }) {
+  const def = ITEMS[id];
+  const url = def?.icon ? SPRITE_URLS[def.icon] : undefined;
+  if (url) return <img className="ico" src={url} alt={def?.name ?? id} draggable={false} />;
+  return <span className="chip" style={{ background: def?.color ?? "#888" }} />;
 }
 
 function Bar({ value, color, label }: { value: number; color: string; label: string }) {

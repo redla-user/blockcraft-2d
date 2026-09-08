@@ -1,7 +1,7 @@
 // Static game data: tiles, items, tools, recipes.
 // Pure data — no rendering, no DOM.
 
-export type TileType = "grass" | "dirt" | "sand" | "water" | "stone" | "farmland";
+export type TileType = "grass" | "dirt" | "sand" | "water" | "stone" | "farmland" | "cave";
 export type Ore = "iron" | "diamond";
 export type ObjKind =
   | "tree"
@@ -37,6 +37,7 @@ export const TILE_COLORS: Record<TileType, [string, string]> = {
   water: ["#3a6fd8", "#2f5fc0"],
   stone: ["#8a8a8a", "#7c7c7c"],
   farmland: ["#6b4a2a", "#5d4024"],
+  cave: ["#4a4a52", "#3e3e46"],
 };
 
 export const GROUND_SOLID: Record<TileType, boolean> = {
@@ -46,6 +47,7 @@ export const GROUND_SOLID: Record<TileType, boolean> = {
   water: true,
   stone: true,
   farmland: false,
+  cave: false,
 };
 
 /** objects that block movement */
