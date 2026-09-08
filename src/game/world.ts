@@ -80,10 +80,20 @@ export class World {
         else t = m > 0.62 ? "dirt" : "grass";
 
         if (t === "stone") {
+          // caves: enclosed dark hollows carved inside rock areas
+          const cv = fbm(wx / 9 + 300, wy / 9 + 300, this.seed + 9001);
+          const deep = cv > 0.62;
+          if (deep) t = "cave";
+          const nearCave = cv > 0.5;
           const o = hash2(wx, wy, this.seed + 777);
-          if (o > 0.985) ore = "diamond";
-          else if (o > 0.93) ore = "iron";
-          if (e > 0.76 && hash2(wx, wy, this.seed + 31) > 0.55) obj = "mountain";
+          if (t === "stone" && nearCave) {
+            // ore is mostly in cave walls; diamond only in the deepest parts
+            if (cv > 0.6 && o > 0.968) ore = "diamond";
+            else if (o > 0.86) ore = "iron";
+          } else if (t === "stone" && o > 0.996) {
+            ore = "iron";
+          }
+          if (t === "stone" && e > 0.76 && hash2(wx, wy, this.seed + 31) > 0.55) obj = "mountain";
         } else if (t === "grass") {
           if (hash2(wx, wy, this.seed + 99) > 0.94) obj = "tree";
         }
